@@ -1,0 +1,113 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: consul-esm
+  labels:
+    app: consul-esm
+  namespace: consul
+spec:
+  type: ClusterIP
+  ports:
+    - port: 9003
+      targetPort: 9003
+  selector:
+    app: consul-esm
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: consul-esm
+  namespace: consul
+automountServiceAccountToken: true
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: consul-esm
+  namespace: consul
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      service: consul-esm
+      app: consul-esm
+  template:
+    metadata:
+      namespace: consul
+      labels:
+        service: consul-esm
+        app: consul-esm
+    spec:
+      serviceAccountName: consul-esm
+      containers:
+        - name: consul-esm
+          image: hashicorp/consul-esm:0.7.1
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 9003
+          env:
+          - name: CONSUL_HTTP_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: consul-bootstrap-acl-token
+                key: token
+          - name: HOST_IP
+            valueFrom:
+              fieldRef:
+                fieldPath: status.hostIP
+          command:
+          - '/bin/sh'
+          - '-ec'
+          - |
+            export CONSUL_HTTP_ADDR="${HOST_IP}:8500"
+            consul-esm -config-file=/esm/config/esm-config.hcl
+          volumeMounts:
+            - name: config-volume
+              mountPath: /esm/config
+            - name: certs-volume
+              mountPath: /esm/certs
+              readOnly: true
+      volumes:
+        - name: config-volume
+          configMap:
+            name: consul-esm-config
+        - name: certs-volume
+          secret:
+            secretName: consul-ca-cert
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: consul-esm-config
+  namespace: consul
+data:
+  esm-config.hcl: |
+    log_level = "DEBUG"
+    enable_syslog = false
+    syslog_facility = ""
+    log_json = false
+    instance_id = "DATACENTER"
+    consul_service = "consul-esm"
+    consul_service_tag = ""
+    consul_kv_path = "consul-esm/"
+    external_node_meta {
+        "external-node" = "true"
+    }
+    node_reconnect_timeout = "1h"
+    node_probe_interval = "10s"
+    disable_coordinate_updates = false
+    http_addr = ""
+    datacenter = "DATACENTER"
+    ca_file = "/esm/certs/tls.crt"
+    ca_path = ""
+    cert_file = ""
+    key_file = ""
+    tls_server_name = ""
+    https_ca_file = ""
+    https_ca_path = ""
+    https_cert_file = ""
+    https_key_file = ""
+    client_address = ""
+    ping_type = "socket"
+    passing_threshold = 0
+    critical_threshold = 0

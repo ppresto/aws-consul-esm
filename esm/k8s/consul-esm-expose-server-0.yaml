@@ -1,0 +1,41 @@
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: consul
+    statefulset.kubernetes.io/pod-name: consul-server-0
+    component: server
+  name: consul-expose-server-0
+  namespace: consul
+spec:
+  ports:
+  - name: http
+    port: 8500
+    protocol: TCP
+    targetPort: 8500
+  - name: https
+    port: 8501
+    protocol: TCP
+    targetPort: 8501
+  - name: serflan
+    port: 8301
+    protocol: TCP
+    targetPort: 8301
+  - name: rpc
+    port: 8300
+    protocol: TCP
+    targetPort: 8300
+  - name: grpc
+    port: 8502
+    protocol: TCP
+    targetPort: 8502
+  selector:
+    app: consul
+    component: server
+    statefulset.kubernetes.io/pod-name: consul-server-0
+  sessionAffinity: None
+  type: LoadBalancer
+status:
+  loadBalancer:
+    ingress:
+    - hostname: k8s-consul-consulex-7705bc95be-bf790a9835fb29aa.elb.us-west-2.amazonaws.com

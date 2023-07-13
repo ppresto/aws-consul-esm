@@ -1,0 +1,24 @@
+{
+    "Node": "ip-10-17-1-37.us-west-2.compute.internal",
+    "Address": "10.17.1.37",
+    "NodeMeta": {
+      "external-node": "true",
+      "external-probe": "true"
+    },
+    "Service": {
+      "ID": "web-dc2",
+      "Service": "web",
+      "Port": 8080
+    },
+    "Checks": [
+      {
+        "Name": "http-check",
+        "status": "passing",
+        "Definition": {
+          "http": "http://10.17.1.37:8080/health",
+          "interval": "30s"
+        }
+      }
+    ]
+  }
+  

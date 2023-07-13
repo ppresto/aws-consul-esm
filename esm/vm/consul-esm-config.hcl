@@ -1,0 +1,30 @@
+log_level = "INFO"
+enable_syslog = false
+syslog_facility = ""
+log_json = false
+instance_id = ""
+consul_service = "consul-esm"
+consul_service_tag = ""
+consul_kv_path = "consul-esm/"
+external_node_meta {
+    "external-node" = "true"
+}
+node_reconnect_timeout = "72h"
+node_probe_interval = "10s"
+disable_coordinate_updates = false
+http_addr = "k8s-consul-consulex-7705bc95be-bf790a9835fb29aa.elb.us-west-2.amazonaws.com:8500"
+token = ""
+datacenter = "dc1"
+ca_file = "/etc/consul.d/certs/ca.pem"
+ca_path = ""
+cert_file = ""
+key_file = ""
+tls_server_name = ""
+https_ca_file = ""
+https_ca_path = ""
+https_cert_file = ""
+https_key_file = ""
+client_address = ""
+ping_type = "socket"
+passing_threshold = 0
+critical_threshold = 0
