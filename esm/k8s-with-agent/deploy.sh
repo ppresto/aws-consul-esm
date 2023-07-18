@@ -43,6 +43,10 @@ deploy () {
 	kubectl apply -f ${SCRIPT_DIR}/consul-esm.yaml
 	echo
 
+	echo "Deploying learn-ext.json - http-check"
+	echo "curl --silent --header \"X-Consul-Token: ${CONSUL_HTTP_TOKEN}\" --request PUT --data @${SCRIPT_DIR}/learn-ext.json ${CONSUL_HTTP_ADDR}/v1/catalog/register"
+	curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data @${SCRIPT_DIR}/learn-ext.json ${CONSUL_HTTP_ADDR}/v1/catalog/register
+
 	echo
 	echo "Deploying ${EXT_SERVICE_JSON} - http-check"
 	echo "curl --silent --header \"X-Consul-Token: ${CONSUL_HTTP_TOKEN}\" --request PUT --data @${SCRIPT_DIR}/${EXT_SERVICE_JSON} ${CONSUL_HTTP_ADDR}/v1/catalog/register"

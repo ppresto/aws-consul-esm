@@ -46,7 +46,7 @@ terraform apply -auto-approve
 ```
 
 ### Upgrade consul to run agents
-An agent should be deployed to K8s if using this repo's infrastructure so skip this step.  This terraform above creates a helm values file when installing Consul.  This can be found for each Consul cluster.  For example, consul1 cluster used these helm values `./quickstart/1vpc-2eks/consul_helm_values/yaml/auto-consul-vpc1-consul1-values-server-sd.yaml`.  This file can be used directly with `helm upgrade` to test various configurations.  
+An agent should be deployed to K8s if using this repo's infrastructure so skip this step.  The terraform above creates a helm values file when installing Consul.  This can be found for each Consul cluster.  For example, consul1 cluster used these helm values `./quickstart/1vpc-2eks/consul_helm_values/yaml/auto-consul-vpc1-consul1-values-server-sd.yaml`.  This file can be used directly with `helm upgrade` to test various configurations.  
 
 
 Example: Running helm upgrade
@@ -117,7 +117,7 @@ ssh -A -J ubuntu@${bastion} ubuntu@${vm1}
 You should no be ssh'd into vm1. vm1 will be part of Consul dc1, and vm2 will be part of Consul dc2.  
 Note: When running the below commands you can update the service Name to reflect the DC if graphically doing the failover.  For example,
 ```
-export NAME-"web-dc1"
+export NAME="web"    #export NAME="web-dc1"
 ```
 
 Install fake service by copying and pasting the following in the VM terminal.
