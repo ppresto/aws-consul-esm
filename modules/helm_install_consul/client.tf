@@ -35,24 +35,7 @@ resource "helm_release" "consul_client" {
   })]
   depends_on = [kubernetes_namespace.consul]
 }
-# data "template_file" "consul-client" {
-#   template = file("${path.module}/templates/${var.consul_helm_chart_template}")
-#   vars = {
-#     consul_version            = var.consul_version
-#     consul_helm_chart_version = var.consul_helm_chart_version
-#     server_replicas           = var.server_replicas
-#     cluster_name              = var.cluster_name
-#     datacenter                = var.datacenter
-#     partition                 = var.consul_partition
-#     eks_cluster               = var.eks_cluster_endpoint
-#     consul_external_servers   = var.consul_external_servers
-#     node_selector             = var.node_selector
-#   }
-# }
-# resource "local_file" "helm-values" {
-#   content  = data.template_file.consul-client.rendered
-#   filename = "./yaml/auto-${var.release_name}-${var.consul_helm_chart_template}"
-# }
+
 resource "local_file" "helm-values" {
   content  = templatefile("${path.module}/templates/${var.consul_helm_chart_template}",
   {
