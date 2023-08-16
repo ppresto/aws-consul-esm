@@ -1,3 +1,4 @@
+![Consul ESM](https://github.com/ppresto/aws-consul-esm/blob/main/consul-esm.png?raw=true)
 - [consul-aws-esm](#consul-aws-esm)
   - [Getting Started](#getting-started)
     - [Pre Reqs](#pre-reqs)
