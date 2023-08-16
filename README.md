@@ -1,5 +1,12 @@
+# consul-aws-esm
+Use Consul to monitor external services and provide geo failover for them.
+This repo will deploy 2 consul data centers (DC1 | DC2) on kubernetes to provide a comprehensive service networking platform in each datacenter.  Along with the servers it deploys consul-esm and registers an external service in each DC for consul to continuously healthcheck.  This could be any cloud native service or in this case an EC2 service called `schema-registry`.  This service is outside your teams control.  Once these ext services are health checked take advantage of Consul DNS to provide advanced Geo-failover.  Each data center (DC1 | DC2) will run `myservice` which depends on the external service `schema-registry`.  If the schema-registry goes down in DC1 all services that depend on this will need to automatically be routed to the next available `schema-registry` which is in DC2.
+
 ![Consul ESM](https://github.com/ppresto/aws-consul-esm/blob/main/consul-esm.png?raw=true)
+
+
 - [consul-aws-esm](#consul-aws-esm)
+- [consul-aws-esm](#consul-aws-esm-1)
   - [Getting Started](#getting-started)
     - [Pre Reqs](#pre-reqs)
   - [Provision Infrastructure](#provision-infrastructure)
