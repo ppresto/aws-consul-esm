@@ -30,9 +30,9 @@ create () {
     --request POST \
     --data @- <<-EOF
 {
-  "Name": "web",
+  "Name": "schema-registry",
   "Service": {
-    "Service": "web",
+    "Service": "schema-registry",
     "Failover": {
 		"Targets": [
 			{"Peer": "dc1-default"},
@@ -61,5 +61,5 @@ if [[ ! -z $1 ]]; then
 	delete
 else
     create
-	list
+	#list
 fi

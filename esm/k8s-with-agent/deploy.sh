@@ -20,19 +20,10 @@ fi
 
 ESM_DATA=$(curl ${CONSUL_HTTP_ADDR}/v1/catalog/service/consul-esm)
 DATACENTER=$(curl --silent ${CONSUL_HTTP_ADDR}/v1/catalog/datacenters | jq -r '.[]')
-#EXT_SERVICE_JSON="learn-ext.json"
-EXT_SERVICE_JSON="web-ext-${DATACENTER}.json"
 
 deploy () {
-	# echo "Registering external service - learn"
-	# curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data @${SCRIPT_DIR}/external.json ${CONSUL_HTTP_ADDR}/v1/catalog/register
-	# sleep 2
-	# echo
-
-	# echo "Reading service catalog /learn"
-	# curl ${CONSUL_HTTP_ADDR}/v1/catalog/service/learn | jq -r
-	# echo
-	
+	echo "Deploy myservice-${DATACENTER}"
+	sed "s/myservice/myservice-${DATACENTER}/g" ${SCRIPT_DIR}/myservice.yaml | kubectl apply -f -
 	echo "Check if consul-esm service returns metadata..."
 	curl --silent ${CONSUL_HTTP_ADDR}/v1/catalog/service/consul-esm | jq -r
 	echo
@@ -43,21 +34,23 @@ deploy () {
 	kubectl apply -f ${SCRIPT_DIR}/consul-esm.yaml
 	echo
 
-	echo "Deploying learn-ext.json - http-check"
-	echo "curl --silent --header \"X-Consul-Token: ${CONSUL_HTTP_TOKEN}\" --request PUT --data @${SCRIPT_DIR}/learn-ext.json ${CONSUL_HTTP_ADDR}/v1/catalog/register"
-	curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data @${SCRIPT_DIR}/learn-ext.json ${CONSUL_HTTP_ADDR}/v1/catalog/register
+	# echo "Deploying learn-ext.json - http-check"
+	# echo "curl --silent --header \"X-Consul-Token: ${CONSUL_HTTP_TOKEN}\" --request PUT --data @${SCRIPT_DIR}/learn-ext.json ${CONSUL_HTTP_ADDR}/v1/catalog/register"
+	# curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data @${SCRIPT_DIR}/learn-ext.json ${CONSUL_HTTP_ADDR}/v1/catalog/register
 
 	echo
-	echo "Deploying ${EXT_SERVICE_JSON} - http-check"
-	echo "curl --silent --header \"X-Consul-Token: ${CONSUL_HTTP_TOKEN}\" --request PUT --data @${SCRIPT_DIR}/${EXT_SERVICE_JSON} ${CONSUL_HTTP_ADDR}/v1/catalog/register"
-	curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data @${SCRIPT_DIR}/${EXT_SERVICE_JSON} ${CONSUL_HTTP_ADDR}/v1/catalog/register
+	echo "Deploying ${FILE} - health checks"
+	echo "curl --silent --header \"X-Consul-Token: ${CONSUL_HTTP_TOKEN}\" --request PUT --data @${SCRIPT_DIR}/${FILE} ${CONSUL_HTTP_ADDR}/v1/catalog/register"
+	curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data @${SCRIPT_DIR}/${FILE} ${CONSUL_HTTP_ADDR}/v1/catalog/register
 	sleep 2
 	echo
+	echo "myservice-${DATACENTER} URL (wait a couple minutes for DNS resolution)"
+	echo "http://$(kubectl get svc myservice-${DATACENTER} -o json | jq -r '.status.loadBalancer.ingress[].hostname'):9090/ui"
 }
 
 node_data() {
-  Node=$(cat ${SCRIPT_DIR}/${EXT_SERVICE_JSON} | jq -r '.Node')
-  Address=$(cat ${SCRIPT_DIR}/${EXT_SERVICE_JSON} | jq -r '.Address')
+  Node=$(cat ${SCRIPT_DIR}/${FILE} | jq -r '.Node')
+  Address=$(cat ${SCRIPT_DIR}/${FILE} | jq -r '.Address')
   cat <<EOF
 {
   "Node": "$Node",
@@ -84,37 +77,81 @@ delete () {
 	#Deregister learn1 as an entity (aka: node), not a service.
 	# curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data '{"Node": "hashicorp","Address": "learn.hashicorp.com"}' ${CONSUL_HTTP_ADDR}/v1/catalog/deregister
 
-	Node=$(cat ${SCRIPT_DIR}/${EXT_SERVICE_JSON} | jq -r '.Node')
-	Address=$(cat ${SCRIPT_DIR}/${EXT_SERVICE_JSON} | jq -r '.Address')
-	ServiceID=$(cat ${SCRIPT_DIR}/${EXT_SERVICE_JSON} | jq -r '.Service.ID')
+	Node=$(cat ${SCRIPT_DIR}/${FILE} | jq -r '.Node')
+	Address=$(cat ${SCRIPT_DIR}/${FILE} | jq -r '.Address')
+	ServiceID=$(cat ${SCRIPT_DIR}/${FILE} | jq -r '.Service.ID')
 	
+	#recycle client so esm service can be removed.
+	kubectl -n consul delete po -l component=client
+
 	# deregister node
 	echo "Deleting Service Node"
 	#echo "curl --silent --header \"X-Consul-Token: ${CONSUL_HTTP_TOKEN}\" --request PUT --data '{\"Datacenter\": \"dc1\",\"Node\": \"${Node}\"}' ${CONSUL_HTTP_ADDR}/v1/catalog/deregister"
 	echo "curl --silent --header \"X-Consul-Token: ${CONSUL_HTTP_TOKEN}\" --request PUT --data '{\"Node\": \"${Node}\",\"Address\": \"${Address}\"}' ${CONSUL_HTTP_ADDR}/v1/catalog/deregister"
 	curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data "$(node_data)" ${CONSUL_HTTP_ADDR}/v1/catalog/deregister
-	
-	# Deregister demo learn service if running
-	curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data '{"Node": "hashicorp","Address": "learn.hashicorp.com"}' ${CONSUL_HTTP_ADDR}/v1/catalog/deregister
-
-	#curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data '{"Node": "${Node}","Address": "${Address}"}' ${CONSUL_HTTP_ADDR}/v1/catalog/deregister
-	echo $(node_data)
-	sleep 5
 
 	#Deregister service entity
 	echo "Deleting Service consul-esm"
 	curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data "$(consul_esm_data)"  ${CONSUL_HTTP_ADDR}/v1/catalog/deregister
 	echo "curl --silent --header \"X-Consul-Token: ${CONSUL_HTTP_TOKEN}\" --request PUT --data "$(consul_esm_data)"  ${CONSUL_HTTP_ADDR}/v1/catalog/deregister"
-	echo $(consul_esm_data)
+	#echo $(consul_esm_data)
+
+
+	echo "Checking for default learn service..."
+	curl --silent ${CONSUL_HTTP_ADDR}/v1/catalog/service/learn | jq -r
+	if [[ $? == 0 ]]; then
+		# Deregister demo learn service if running
+		curl --silent --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT --data '{"Node": "hashicorp","Address": "learn.hashicorp.com"}' ${CONSUL_HTTP_ADDR}/v1/catalog/deregister
+	fi
 	
-	#curl --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT ${CONSUL_HTTP_ADDR}/v1/agent/service/deregister/web1
+	#curl --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT ${CONSUL_HTTP_ADDR}/v1/agent/service/deregister/schemaRegistry
 	# curl --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT ${CONSUL_HTTP_ADDR}/v1/agent/check/deregister/http-check
 	# curl --header "X-Consul-Token: ${CONSUL_HTTP_TOKEN}" --request PUT ${CONSUL_HTTP_ADDR}/v1/agent/check/deregister/externalNodeHealth
 	kubectl delete -f ${SCRIPT_DIR}/consul-esm.yaml
+	#sed "s/myservice/myservice-${DATACENTER}/g" ../../esm/k8s-with-agent/myservice.yaml | kubectl delete -f -
 }
 
+usage() { 
+    echo "Usage: $0 [-f <ext-svc-registration.json> ] [-d]" 1>&2; 
+    echo
+    echo "Example: $0 -f svc-ext-dc1.json"
+	echo "Example: $0 -f svc-ext-dc1.json -d  #delete svc"
+    exit 1; 
+}
+
+while getopts "df:" o; do
+    case "${o}" in
+        f)
+            FILE="${OPTARG}"
+            echo "Setting service registration file: $FILE"
+            if ! [[ -f $FILE ]]; then
+				echo "File does not exist [ $FILE ]"
+                usage
+				exit 1
+            fi
+            ;;
+		d)
+            DELETE=true
+            ;;
+        *)
+            usage
+            ;;
+    esac
+done
+shift $((OPTIND-1))
+
+if [[ -z $FILE ]]; then
+	FILE="learn-ext.json"
+fi
+
+if [[ $DELETE == true && -z $FILE ]]; then
+	echo "Missing a service registration file.  [ -f <ext-svc-registration.json> ]"
+	echo "Defaulting to [ -f learn-ext.json ]"
+	FILE="learn-ext.json"
+fi
+
 #Cleanup if any param is given on CLI
-if [[ ! -z $1 ]]; then
+if [[ $DELETE == true ]]; then
 	delete
 else
     deploy

@@ -56,15 +56,17 @@ helm upgrade ${RELEASE} hashicorp/consul --namespace consul --values ./yaml/auto
 ```
 If you're building Consul outside of this repo ensure the helm values are set properly.
 
-## Deploy EMS on K8s with an agent
+## Deploy ESM on K8s with an agent
 Connect to the EKS cluster hosting Consul and set your current K8s context to the first EKS cluster `consul1`.
-The script below will register the external learn svc.  To test failover across DCs skip this step and jump to the optional section below and deploy fake-service on the two VMs that were created in this repo.
+The script below will register the default external learn svc if no arguments are given.  To test failover on specific ext services across DCs skip this step and there will be an option later to register an external service on VM (fake-service).
 ```
-cd ../../../esm/k8s-with-agent
+unset CONSUL_HTTP_TOKEN
+unset CONSUL_HTTP_ADDR
+cd ../
 consul1
-./deploy.sh
+../../esm/k8s-with-agent/deploy.sh
 consul2
-./deploy.sh
+../../esm/k8s-with-agent/deploy.sh
 ```
 
 ### Review Consul UI's
@@ -96,9 +98,9 @@ consul1
 kc exec statefulset/consul-server -- nslookup consul.service.consul
 kc exec statefulset/consul-server -- nslookup learn.service.consul
 consul2
-kc exec statefulset/consul-server -- nslookup learn.service.consul
+kc exec statefulset/consul-server -- nslookup schema-registry.service.consul
 ```
-### Deploy consul-esm and validate Geo-Failover across DCs with prepared queries.
+## Deploy fake-service and validate Geo-Failover across DCs with prepared queries.
 If there are two datacenters do these steps in each one. This repo requires the use of a bastion host to SSH to the internal VMs.  The infra built from this repo will work with the below shortcuts.
 ```
 cd ../../quickstart/1vpc-2eks
@@ -113,11 +115,11 @@ ssh-add -L ${HOME}/.ssh/ppresto-ptfe-dev-key.pem
 ssh -A -J ubuntu@${bastion} ubuntu@${vm1}
 ```
 
-#### Install fake service (web) and run it on each VM.
-You should no be ssh'd into vm1. vm1 will be part of Consul dc1, and vm2 will be part of Consul dc2.  
+### Install fake service (schema-registry) on one VM in each datacenter (2 VMs).
+You should be ssh'd into vm1. vm1 will be part of Consul dc1, and vm2 will be part of Consul dc2.  
 Note: When running the below commands you can update the service Name to reflect the DC if graphically doing the failover.  For example,
 ```
-export NAME="web"    #export NAME="web-dc1"
+export NAME="schema-registry-dc1"
 ```
 
 Install fake service by copying and pasting the following in the VM terminal.
@@ -132,7 +134,7 @@ cat >${HOME}/fake-service/start.sh <<-EOF
 #!/bin/bash
 
 export MESSAGE="Web RESPONSE"
-export NAME="web"
+export NAME="$NAME"
 export SERVER_TYPE="http"
 export LISTEN_ADDR="0.0.0.0:8080"
 nohup ./bin/fake-service > logs/fake-service.out 2>&1 &
@@ -144,12 +146,14 @@ cd ${HOME}/fake-service
 exit
 ```
 
-Repeat this for vm2
+SSH to the new host and update the service name with dc2.
 ```
 ssh -A -J ubuntu@${bastion} ubuntu@${vm2}
+export NAME="schema-registry-dc2"
 ```
+Now Copy/Paste the steps above to installl fake-service to vm2.
 
-#### Edit 2 ext service files to point to the service on each VM.
+### Configure the fake-service (schema-registry) for each DC.
 Query the environment to collect the VM Node(hostname), and IP Address.  These files will be registered by the correct Consul DC in the next step.
 
 Run the following commands to get dc1 vm1 environment values.
@@ -157,10 +161,10 @@ Run the following commands to get dc1 vm1 environment values.
 output=$(terraform output -json)
 NODE=$(echo $output | jq -r '.usw2_ec2_dns.value."vpc1-vm1"')
 ADDRESS=$(echo $output | jq -r '.usw2_ec2_ip.value."vpc1-vm1"')
-ID="web-dc1"
+ID="schema-registry-dc1"
 echo -e " NODE: $NODE \n ADDRESS: $ADDRESS\n ID: $ID"
 ```
-Edit `./esm/k8s-with-agent/web-ext-dc1.json` with the these values and replace both attributes below with $ADDRESS.
+Edit `./esm/k8s-with-agent/svc-ext-dc1.json` with the these values and replace both attributes below with $ADDRESS.
 * Address
 * http-check url address 
 
@@ -169,54 +173,38 @@ Run the following commands to get dc1 vm2 environment values.
 output=$(terraform output -json)
 NODE=$(echo $output | jq -r '.usw2_ec2_dns.value."vpc1-vm2"')
 ADDRESS=$(echo $output | jq -r '.usw2_ec2_ip.value."vpc1-vm2"')
-ID="web-dc2"
+ID="schema-registry-dc2"
 echo -e " NODE: $NODE \n ADDRESS: $ADDRESS\n ID: $ID"
 ```
-Edit `./esm/k8s-with-agent/web-ext-dc2.json` with the these values and replace both attributes below with $ADDRESS.
-* Address
-* http-check url address 
+Edit `./esm/k8s-with-agent/svc-ext-dc2.json` with the these values.
+* `Node`
+* `Address`
+* Update http-check url with `Address` 
 
-#### Register the web svc on each Consul DC.
-Update `./esm/k8s-with-agent/deploy.sh` with the new external service file value. 
+### Register the the fake-service (schema-registry) in each DC.
+Rerun `./esm/k8s-with-agent/deploy.sh` with the new service registration files.  This script will run against the current k8s context.
 ```
-#EXT_SERVICE_JSON="learn-ext.json"
-EXT_SERVICE_JSON="web-ext-${DATACENTER}.json"
-```
-Rerun `./esm/k8s-with-agent/deploy.sh`.  This script will run against the current k8s context.
-```
-cd ../../esm/k8s-with-agent
 consul1
-./deploy.sh
+../../esm/k8s-with-agent/deploy.sh -f ../../esm/k8s-with-agent/svc-ext-dc1.json
 
 consul2
-./deploy.sh
+../../esm/k8s-with-agent/deploy.sh -f ../../esm/k8s-with-agent/svc-ext-dc2.json
 ```
-Review the Consul UI's to see the new `web` service registered and being healthchecked by ESM.
-#### Setup Peering between both Datacenters for Failover
-Peer the two Consul DC's so services like `web` can discover and failover across them.
+Review the Consul UI's to see the new service registered and being healthchecked by ESM.
+## Setup Peering between both Datacenters for Failover
+Peer the two Consul DC's so services can discover and failover across data centers.
 
-The peering scripts assume the following:
+The peering script `./esm/peering/peer_dc1_to_dc2.sh` assumes the following:
 * Consul is running on K8s
 * current datacenters are dc1, dc2
 * current terminal is authN to both K8s clusters
 * K8s contexts are consul1, consul2
 * Sets mesh defaults to Peer through Mesh Gateways
-
-If anything is different make the necessary adjustments.
-```
-cd ../peering
-```
-
-Update `peer_dc1_to_dc2.sh` to reflect your K8s contexts if different.
-```
-#  Setup Kubeconfig to auth into AKS Consul cluster
-CTX1=consul1
-CTX2=consul2
-```
+If anything is different make the necessary adjustments to the script before running.
 
 Peer the two clusters
 ```
-./peer_dc1_to_dc2.sh
+../../esm/peering/peer_dc1_to_dc2.sh
 ```
 Note:  To peer directly from Consul servers instead of the more secure design using Mesh Gateways comment out the following lines setting up the mesh defaults to peer through MGW.
 ```
@@ -224,34 +212,33 @@ Note:  To peer directly from Consul servers instead of the more secure design us
 #kubectl -n consul --context ${CTX2} apply -f ${CUR_SCRIPT_DIR}/mesh.yaml
 ```
 
-####  Create Prepared Query
-Go to each EKS context and create a prepared query that will failover the `web` service across peers.  The following script will use the current-contex, create a prepared query for that DC, and list the defined queries to verify it was created.
-```
-cd ../prepared_query
-consul1
-./deploy.sh
-consul2
-./deploy.sh
-```
-
-#### Validate Failover
-
-Go to each DC and lookup web.query.consul.  The local IP should be returned.
+##  Create Prepared Query
+Go to each EKS context and create a prepared query that will failover the service (ex: `schema-registry`) across peers.  The following script will use the current-contex, create a prepared query for that DC, and list the defined queries to verify it was created.
 ```
 consul1
-kc exec statefulset/consul-server -- nslookup web.query.consul
+../../esm/prepared_query/deploy.sh
 consul2
-kc exec statefulset/consul-server -- nslookup web.query.consul
+../../esm/prepared_query/deploy.sh
 ```
 
-SSH to vm1 and kill web
+## Validate Failover
+
+Go to each DC and lookup schema-registry.query.consul.  The local IP should be returned.
+```
+consul1
+kc exec statefulset/consul-server -- nslookup schema-registry.query.consul
+consul2
+kc exec statefulset/consul-server -- nslookup schema-registry.query.consul
+```
+
+SSH to vm1 and kill fake-service (ie: schema-registry)
 ```
 ssh -A -J ubuntu@${bastion} ubuntu@${vm1}
 pkill fake-service
 exit
 ```
 Wait a couple seconds ...
-ESM may take a couple seconds to identify the unhealthy instance depending on its configuration.  Once the UI shows `web` in dc1 failing test out the query in dc1 again.
+ESM may take a couple seconds to identify the unhealthy instance depending on its configuration.  Once the UI shows `schema-registry` in dc1 failing test out the query in dc1 again.
 
 ```
 consul1
@@ -259,30 +246,25 @@ kc exec statefulset/consul-server -- nslookup web.query.consul
 ```
 This time the IP returned should be the IP address of the `web` service in DC2.
 
-### Clean Up
-Go to `./esm` directory
+## Clean Up
+Remove the peering connection, consul-esm, web and learn ext monitors, and prepared queries.
 ```
-cd ..
-```
-
-Cut and paste the following commands to remove the peering connection, consul-esm, web and learn ext monitors, and prepared queries.
-```
-peering/peer_dc1_to_dc2.sh -d
+../../esm/peering/peer_dc1_to_dc2.sh -d
 
 consul1
-prepared_query/deploy.sh -d
+../../esm/prepared_query/deploy.sh -d
 kubectl -n consul delete po -l component=client
-k8s-with-agent/deploy.sh -d
+../../esm/k8s-with-agent/deploy.sh -d -f ../../esm/k8s-with-agent/svc-ext-dc1.json
 
 consul2
-prepared_query/deploy.sh -d
+../../esm/prepared_query/deploy.sh -d
 kubectl -n consul delete po -l component=client
-k8s-with-agent/deploy.sh -d
+../../esm/k8s-with-agent/deploy.sh -d -f ../../esm/k8s-with-agent/svc-ext-dc2.json
 ```
 
 Uninstall all Consul datacenters using Terraform's helm provider
 ```
-cd ../quickstart/vpc1-eks2/consul_helm_values
+cd consul_helm_values
 terraform destroy -auto-approve
 ```
 
@@ -290,6 +272,37 @@ Uninstall infrastructure
 ```
 cd ../
 terraform destroy -auto-approve
+```
+
+## Quick Start - Demo Steps
+If already deployed and cleaned up using the steps above, the `myservice` k8s LB service should be externally available on 9090.  This will speed up demo by 3-5m.
+Now execute the following tasks for each datacenter:
+* Deploy ESM and register the external service
+* Create the prepared query for DNS failover
+* Validate DNS from K8s `myservice` pod.
+
+```
+consul1
+../../esm/k8s-with-agent/deploy.sh -f ../../esm/k8s-with-agent/svc-ext-dc1.json
+../../esm/prepared_query/deploy.sh
+
+consul2
+../../esm/k8s-with-agent/deploy.sh -f ../../esm/k8s-with-agent/svc-ext-dc2.json
+../../esm/prepared_query/deploy.sh
+
+../../esm/peering/peer_dc1_to_dc2.sh
+```
+Finaly, Peer the datacenters to enable failover
+
+Validate failover
+```
+ssh-add -L ${HOME}/.ssh/ppresto-ptfe-dev-key.pem
+vm1=$(terraform output -json | jq -r '.usw2_ec2_ip.value."vpc1-vm1"')
+vm2=$(terraform output -json | jq -r '.usw2_ec2_ip.value."vpc1-vm2"')
+bastion=$(terraform output -json | jq -r '.usw2_ec2_ip.value."vpc1-bastion"')
+
+ssh -A -J ubuntu@${bastion} ubuntu@${vm1}
+pkill fake-service
 ```
 
 ## Appendix

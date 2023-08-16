@@ -1,13 +1,13 @@
 {
-    "Node": "ip-10-17-1-70.us-west-2.compute.internal",
-    "Address": "10.17.1.70",
+    "Node": "ip-10-17-1-62.us-west-2.compute.internal",
+    "Address": "10.17.1.62",
     "NodeMeta": {
       "external-node": "true",
       "external-probe": "true"
     },
     "Service": {
-      "ID": "web-dc1",
-      "Service": "web",
+      "ID": "schema-registry-dc2",
+      "Service": "schema-registry",
       "Port": 8080
     },
     "Checks": [
@@ -15,8 +15,9 @@
         "Name": "http-check",
         "status": "passing",
         "Definition": {
-          "http": "http://10.17.1.70:8080/health",
-          "interval": "30s"
+          "http": "http://10.17.1.62:8080/health",
+          "interval": "1s",
+          "timeout": "5s"
         }
       }
     ]

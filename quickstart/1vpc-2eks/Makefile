@@ -1,10 +1,8 @@
-.PHONY: all init destroy fmt clean
-.PHONY: infra eks-connect consul-server consul-dataplane awslb
-
-K8S_CONTEXT=`terraform output -json usw2_projects | jq -r '.[]'`
-
-all: infra consul patch-coredns-consul-sd
-destroy: consul-clean infra-clean
+.PHONY: all init deploy plan destroy fmt clean
+.PHONY: consul consul-info awslb consul-demo consul-dns consul-esm peer
+SHELL:= /bin/bash
+all: infra consul consul-demo
+consul-demo: consul-dns consul-esm peer consul-info
 
 fmt:
 	@terraform fmt -recursive
@@ -13,48 +11,56 @@ init: fmt
 	@terraform init
 
 infra: init
-	@-terraform apply -auto-approve
+	@terraform apply -auto-approve
+	@echo "Source the following script to connect to all EKS clusters"
+	@echo
+	@echo "source ../../scripts/kubectl_connect_eks.sh ."
 
-eks-connect:
-	@source "../../scripts/kubectl_connect_eks.sh" .
+consul: awslb server
 
 awslb:
 	@../../scripts/install_awslb_controller.sh .
 
-awslb-clean:
-	@-../../scripts/install_awslb_controller.sh . delete
-
-consul: consul-server consul-info consul-patch-coredns
-
-consul-server: eks-connect awslb
+server:
 	@terraform -chdir="consul_helm_values" init
 	@terraform -chdir="consul_helm_values" apply -auto-approve
 
-consul-patch-coredns:
-	@kubectl config use-context consul1
-	@../../scripts/patch_coredns_to_fwd_to_consul.sh
-	@kubectl config use-context consul2
-	@../../scripts/patch_coredns_to_fwd_to_consul.sh
-
-consul-peer-dc1-to-dc2:
-	@../../esm/peering/peer_dc1_to_dc2.sh
-
-consul-esm-deploy-learn:
-	@../../esm/k8s-with-agent/deploy.sh
-
 consul-info:
+	@echo "Login to each Consul Server UI"
 	@kubectl config use-context consul1
-	@setConsulEnv.sh
+	@ ../../scripts/setConsulEnv.sh .
+	@echo
 	@kubectl config use-context consul2
-	@setConsulEnv.sh
+	@ ../../scripts/setConsulEnv.sh .
+	@echo
+	@echo "README.md Next Steps..."
+	@echo "Deploy fake-service, register external service, Test failover"
 
-consul-clean: eks-connect
+consul-dns:
+	@kubectl config use-context consul1
+	@ ../../scripts/patch_coredns_to_fwd_to_consul.sh
+	@kubectl config use-context consul2
+	@ ../../scripts/patch_coredns_to_fwd_to_consul.sh
+
+consul-esm:
+	@kubectl config use-context consul1
+	@ ../../scripts/setConsulEnv.sh .
+	@ ../../esm/k8s-with-agent/deploy.sh -f ../../esm/k8s-with-agent/svc-ext-dc1.json
+	@kubectl config use-context consul2
+	@ ../../scripts/setConsulEnv.sh .
+	@ ../../esm/k8s-with-agent/deploy.sh -f ../../esm/k8s-with-agent/svc-ext-dc2.json
+
+peer:
+	@ ../../esm/peering/peer_dc1_to_dc2.sh
+
+consul-clean:
+	@ ../../examples/apps-2vpc-dataplane-ap-def/fake-service/deploy.sh delete
 	@-terraform -chdir="consul_helm_values" destroy -auto-approve
-	@-kubectl -n consul --context=consul1 delete secrets consul-ca-cert consul-bootstrap-acl-token
-	@-kubectl -n consul --context=consul2 delete secrets consul-ca-cert consul-bootstrap-acl-token
-
-infra-clean: awslb-clean
+	@- helm uninstall -n kube-system aws-load-balancer-controller eks/aws-load-balancer-controller
 	@terraform destroy -auto-approve
+
+destroy: init consul-clean
+	@terraform destroy -auto-approve 
 
 clean:
 	-rm -rf .terraform/
