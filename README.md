@@ -1,12 +1,11 @@
-# consul-aws-esm
-Use Consul to monitor external services and provide geo failover for them.
-This repo will deploy 2 consul data centers (DC1 | DC2) on kubernetes to provide a comprehensive service networking platform in each datacenter.  Along with the servers it deploys consul-esm and registers an external service in each DC for consul to continuously healthcheck.  This could be any cloud native service or in this case an EC2 service called `schema-registry`.  This service is outside your teams control.  Once these ext services are health checked take advantage of Consul DNS to provide advanced Geo-failover.  Each data center (DC1 | DC2) will run `myservice` which depends on the external service `schema-registry`.  If the schema-registry goes down in DC1 all services that depend on this will need to automatically be routed to the next available `schema-registry` which is in DC2.
+# Use Consul to provide geo failover for external services outside your environment
+This repo will deploy 2 consul data centers (DC1 | DC2) on kubernetes to provide a comprehensive service networking platform in each datacenter.  Next deploy consul-esm and register an external service in each DC for consul to continuously healthcheck.  This could be any cloud native service or in this case an EC2 service called `schema-registry`.  This service is outside your teams control.  Once these ext services are health checked, take advantage of Consul DNS to provide advanced Geo-failover.  Each data center (DC1 | DC2) will run an instance of `myservice`which is accessible from your browser and depends on the external service `schema-registry`.  If the schema-registry goes down in DC1 all services that depend on this will need to automatically be routed to the next available `schema-registry` which is in DC2 and vice versa.  You will peer DC1 and DC2 so both data centers can discover and route to each others services.   Finally, validate this design is working by stopping DC1's `schema-registry` service and watching `myservice` automatically start using the `schema-regisry` service in DC2.
 
 ![Consul ESM](https://github.com/ppresto/aws-consul-esm/blob/main/consul-esm.png?raw=true)
 
 
+- [Use Consul to provide geo failover for external services outside your environment](#use-consul-to-provide-geo-failover-for-external-services-outside-your-environment)
 - [consul-aws-esm](#consul-aws-esm)
-- [consul-aws-esm](#consul-aws-esm-1)
   - [Getting Started](#getting-started)
     - [Pre Reqs](#pre-reqs)
   - [Provision Infrastructure](#provision-infrastructure)
