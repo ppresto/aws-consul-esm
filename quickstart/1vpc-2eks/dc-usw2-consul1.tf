@@ -175,7 +175,7 @@ locals {
 
   ec2_service_list_usw2 = distinct([for values in local.ec2_map_usw2 : "${values.service}"])
 
-# Create EKS Resource map per Proj/Env
+  # Create EKS Resource map per Proj/Env
   eks_location_usw2 = flatten([for env, values in local.usw2 : {
     "${env}" = values.eks
     }
@@ -185,19 +185,19 @@ locals {
   eks_usw2 = flatten([for env, values in local.eks_location_map_usw2 :
     flatten([for eks, attr in values : {
       "${env}-${eks}" = {
-        "cluster_name"                = attr.cluster_name
-        "cluster_version"             = attr.cluster_version
-        "ec2_ssh_key"                 = attr.ec2_ssh_key
+        "cluster_name"                    = attr.cluster_name
+        "cluster_version"                 = attr.cluster_version
+        "ec2_ssh_key"                     = attr.ec2_ssh_key
         "cluster_endpoint_private_access" = attr.cluster_endpoint_private_access
-        "cluster_endpoint_public_access" = attr.cluster_endpoint_public_access
-        "eks_min_size"                = attr.eks_min_size
-        "eks_max_size"                = attr.eks_max_size
-        "eks_desired_size"            = attr.eks_desired_size
-        "eks_instance_type"           = attr.eks_instance_type
-        "consul_helm_chart_template"  = attr.consul_helm_chart_template
-        "consul_datacenter"           = attr.consul_datacenter
-        "consul_type"                 = attr.consul_type
-        "vpc_env"                     = env
+        "cluster_endpoint_public_access"  = attr.cluster_endpoint_public_access
+        "eks_min_size"                    = attr.eks_min_size
+        "eks_max_size"                    = attr.eks_max_size
+        "eks_desired_size"                = attr.eks_desired_size
+        "eks_instance_type"               = attr.eks_instance_type
+        "consul_helm_chart_template"      = attr.consul_helm_chart_template
+        "consul_datacenter"               = attr.consul_datacenter
+        "consul_type"                     = attr.consul_type
+        "vpc_env"                         = env
       }
     }])
   ])
@@ -239,14 +239,14 @@ module "vpc-usw2" {
     transit_gw = "true"
   }
   private_subnet_tags = {
-    Tier                                                                              = "Private"
-    "kubernetes.io/role/internal-elb"                                                 = 1
+    Tier                                                                                 = "Private"
+    "kubernetes.io/role/internal-elb"                                                    = 1
     "kubernetes.io/cluster/${try(local.usw2.vpc1.eks.consul1.cluster_name, var.prefix)}" = "shared"
     "kubernetes.io/cluster/${try(local.usw2.vpc1.eks.consul2.cluster_name, var.prefix)}" = "shared"
   }
   public_subnet_tags = {
-    Tier                                                                              = "Public"
-    "kubernetes.io/role/elb"                                                          = 1
+    Tier                                                                                 = "Public"
+    "kubernetes.io/role/elb"                                                             = 1
     "kubernetes.io/cluster/${try(local.usw2.vpc1.eks.consul1.cluster_name, var.prefix)}" = "shared"
     "kubernetes.io/cluster/${try(local.usw2.vpc1.eks.consul2.cluster_name, var.prefix)}" = "shared"
   }
@@ -267,7 +267,7 @@ module "eks-usw2" {
     aws = aws.usw2
   }
   source                          = "../../modules/aws_eks_cluster"
-  for_each = local.eks_map_usw2
+  for_each                        = local.eks_map_usw2
   cluster_name                    = try(local.eks_map_usw2[each.key].cluster_name, local.name)
   cluster_version                 = try(local.eks_map_usw2[each.key].eks_cluster_version, var.eks_cluster_version)
   cluster_endpoint_private_access = try(local.eks_map_usw2[each.key].cluster_endpoint_private_access, true)
@@ -309,7 +309,7 @@ module "eks-usw2" {
 
 resource "local_file" "test" {
   for_each = local.eks_map_usw2
-  content  = templatefile("${path.module}/../templates/consul_helm_client.tmpl",
+  content = templatefile("${path.module}/../templates/consul_helm_client.tmpl",
     {
       region_shortname            = "usw2"
       cluster_name                = try(local.eks_map_usw2[each.key].cluster_name, local.name)
@@ -328,7 +328,7 @@ resource "local_file" "test" {
       consul_root_token_secret_id = ""
       partition                   = try(local.eks_map_usw2[each.key].consul_partition, var.consul_partition)
       node_selector               = "" #K8s node label to target deployment too.
-    })
+  })
   filename = "${path.module}/consul_helm_values/auto-${local.eks_map_usw2[each.key].cluster_name}.tf"
 }
 
@@ -414,7 +414,7 @@ output "usw2_vpc_ids" {
 ### EKS
 output "usw2_eks_cluster_endpoints" {
   description = "Endpoint for your Kubernetes API server"
-  value       = { for k, v in local.eks_map_usw2 : k => module.eks-usw2[k].cluster_endpoint}
+  value       = { for k, v in local.eks_map_usw2 : k => module.eks-usw2[k].cluster_endpoint }
 }
 output "usw2_eks_cluster_names" {
   description = "The name/id of the EKS cluster. Will block on cluster creation until the cluster is really ready"

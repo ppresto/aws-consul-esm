@@ -70,6 +70,7 @@ syncCatalog:
   toK8S: false
   k8sAllowNamespaces: ["*"]
   k8sDenyNamespaces: []
+  addK8SNamespaceSuffix: false
   consulNamespaces:
     mirroringK8S: true
 

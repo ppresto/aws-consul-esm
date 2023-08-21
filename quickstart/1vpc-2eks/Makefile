@@ -1,8 +1,7 @@
 .PHONY: all init deploy plan destroy fmt clean
 .PHONY: consul consul-info awslb consul-demo consul-dns consul-esm peer
 SHELL:= /bin/bash
-all: infra consul consul-demo
-consul-demo: consul-dns consul-esm peer consul-info
+all: infra consul consul-dns consul-info
 
 fmt:
 	@terraform fmt -recursive
@@ -54,15 +53,7 @@ peer:
 	@ ../../esm/peering/peer_dc1_to_dc2.sh
 
 consul-clean:
-	@ ../../examples/apps-2vpc-dataplane-ap-def/fake-service/deploy.sh delete
 	@-terraform -chdir="consul_helm_values" destroy -auto-approve
-	@- helm uninstall -n kube-system aws-load-balancer-controller eks/aws-load-balancer-controller
-	@terraform destroy -auto-approve
 
 destroy: init consul-clean
 	@terraform destroy -auto-approve 
-
-clean:
-	-rm -rf .terraform/
-	-rm .terraform.lock.hcl
-	-rm terraform.tfstate*
