@@ -3,20 +3,13 @@ SCRIPT_DIR=$(cd $(dirname "${BASH_SOURCE[0]}") && pwd)
 
 echo "Using Context: $(kubectl config current-context)"
 echo
-echo
-if [[ -z ${CONSUL_HTTP_TOKEN} ]]; then
-	CONSUL_HTTP_TOKEN="$(kubectl -n consul get secret consul-bootstrap-acl-token -o json | jq -r '.data.token'| base64 -d)"
-	echo "Setting CONSUL_HTTP_TOKEN=${CONSUL_HTTP_TOKEN}"
-else
-	echo "CONSUL_HTTP_TOKEN=${CONSUL_HTTP_TOKEN}"
-fi
 
-if [[ -z ${CONSUL_HTTP_ADDR} ]]; then
-	CONSUL_HTTP_ADDR="$(kubectl -n consul get svc consul-ui -o json | jq -r '.status.loadBalancer.ingress[].hostname'):80"
-	echo "Setting CONSUL_HTTP_ADDR=${CONSUL_HTTP_ADDR}"
-else
-	echo "CONSUL_HTTP_ADDR=${CONSUL_HTTP_ADDR}"
-fi
+echo
+CONSUL_HTTP_TOKEN="$(kubectl -n consul get secret consul-bootstrap-acl-token -o json | jq -r '.data.token'| base64 -d)"
+echo "Setting CONSUL_HTTP_TOKEN=${CONSUL_HTTP_TOKEN}"
+
+CONSUL_HTTP_ADDR="$(kubectl -n consul get svc consul-ui -o json | jq -r '.status.loadBalancer.ingress[].hostname'):80"
+echo "Setting CONSUL_HTTP_ADDR=${CONSUL_HTTP_ADDR}"
 
 ESM_DATA=$(curl ${CONSUL_HTTP_ADDR}/v1/catalog/service/consul-esm)
 DATACENTER=$(curl --silent ${CONSUL_HTTP_ADDR}/v1/catalog/datacenters | jq -r '.[]')

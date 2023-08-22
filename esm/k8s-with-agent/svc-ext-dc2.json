@@ -1,6 +1,6 @@
 {
-    "Node": "ip-10-17-1-62.us-west-2.compute.internal",
-    "Address": "10.17.1.62",
+    "Node": "ip-10-17-1-97.us-west-2.compute.internal",
+    "Address": "10.17.1.97",
     "NodeMeta": {
       "external-node": "true",
       "external-probe": "true"
@@ -15,7 +15,7 @@
         "Name": "http-check",
         "status": "passing",
         "Definition": {
-          "http": "http://10.17.1.62:8080/health",
+          "http": "http://10.17.1.97:8080/health",
           "interval": "1s",
           "timeout": "5s"
         }
